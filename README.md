@@ -39,6 +39,8 @@ The built files will be in the `dist` directory, ready for deployment to Cloudfl
 
 ## Deployment to Cloudflare Pages
 
+### Option 1: Using Cloudflare Pages (Recommended)
+
 1. Push your code to a Git repository (GitHub, GitLab, or Bitbucket)
 2. In Cloudflare Dashboard, go to Pages
 3. Connect your repository
@@ -46,6 +48,25 @@ The built files will be in the `dist` directory, ready for deployment to Cloudfl
    - Build command: `npm run build`
    - Build output directory: `dist`
 5. Deploy!
+
+### Option 2: Using Wrangler CLI
+
+1. Build the project:
+   ```bash
+   npm run build
+   ```
+
+2. Deploy using wrangler:
+   ```bash
+   npx wrangler deploy
+   ```
+
+   Or use the npm script:
+   ```bash
+   npm run deploy:direct
+   ```
+
+   The `wrangler.jsonc` configuration file is already set up to deploy the `./dist` directory.
 
 ## JSON File Format
 
