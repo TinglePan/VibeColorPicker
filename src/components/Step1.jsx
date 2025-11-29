@@ -2,6 +2,46 @@ import { useState, useCallback, useEffect } from 'react'
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, ComposedChart, Legend } from 'recharts'
 import './Step1.css'
 
+// Custom Tooltip Content for accurate regression line values
+const CustomTooltip = ({ active, payload, label, m, n, xLabel }) => {
+  if (!active) return null
+  
+  // Get x coordinate (B/R ratio) - label should be the x value
+  const brRatio = label !== null && label !== undefined && typeof label === 'number' ? label : null
+  
+  // Find scatter data point if hovering over one
+  const scatterPayload = payload?.find(p => p.name === 'Data Points')
+  
+  // Always calculate regression line value if we have x coordinate
+  const regressionValue = brRatio !== null ? m * brRatio + n : null
+  
+  return (
+    <div style={{
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      border: '1px solid #ccc',
+      borderRadius: '4px',
+      padding: '8px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+    }}>
+      {brRatio !== null && (
+        <p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>
+          {xLabel}: {brRatio.toFixed(4)}
+        </p>
+      )}
+      {scatterPayload && scatterPayload.payload && (
+        <p style={{ margin: '4px 0', color: '#8884d8' }}>
+          Data Point: {scatterPayload.payload.concentration?.toFixed(2) || 'N/A'}
+        </p>
+      )}
+      {regressionValue !== null && (
+        <p style={{ margin: '4px 0', color: '#ff7300' }}>
+          Regression Line: {regressionValue.toFixed(2)}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function Step1({ 
   data: propData, 
   m: propM, 
@@ -144,13 +184,21 @@ function Step1({
     const maxBr = Math.max(...data.map(d => d.brRatio))
     const padding = (maxBr - minBr) * 0.1 || 0.1
     
-    const x1 = Math.max(0, minBr - padding)
-    const x2 = maxBr + padding
+    const xStart = Math.max(0, minBr - padding)
+    const xEnd = maxBr + padding
     
-    return [
-      { concentration: m * x1 + n, brRatio: x1 },
-      { concentration: m * x2 + n, brRatio: x2 }
-    ]
+    // Generate multiple points along the regression line for accurate tooltips
+    // Using 100 points for smooth interpolation
+    const numPoints = 100
+    const points = []
+    
+    for (let i = 0; i <= numPoints; i++) {
+      const brRatio = xStart + (xEnd - xStart) * (i / numPoints)
+      const concentration = m * brRatio + n
+      points.push({ brRatio, concentration })
+    }
+    
+    return points
   }
 
   const chartData = data ? data.map(d => ({
@@ -269,11 +317,7 @@ function Step1({
                   />
                   <Tooltip
                     cursor={{ strokeDasharray: '3 3' }}
-                    formatter={(value, name) => {
-                      if (name === 'brRatio') return [value.toFixed(4), 'B/R ratio']
-                      if (name === 'concentration') return [value.toFixed(2), 'Concentration']
-                      return [value, name]
-                    }}
+                    content={<CustomTooltip m={m} n={n} xLabel={xLabel} />}
                   />
                   <Scatter
                     name="Data Points"
@@ -281,7 +325,7 @@ function Step1({
                     fill="#8884d8"
                   />
                   <Line
-                    type="monotone"
+                    type="linear"
                     dataKey="concentration"
                     stroke="#ff7300"
                     strokeWidth={2}
@@ -289,6 +333,7 @@ function Step1({
                     name="Regression Line"
                     data={regressionLine}
                     isAnimationActive={false}
+                    connectNulls
                   />
                   <Legend />
                 </ComposedChart>
