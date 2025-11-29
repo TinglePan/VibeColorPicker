@@ -1,10 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
 import './Step2.css'
 
-function Step2({ regressionData }) {
-  const [image, setImage] = useState(null)
-  const [imageUrl, setImageUrl] = useState(null)
-  const [radius, setRadius] = useState(10)
+function Step2({ 
+  regressionData,
+  imageUrl: propImageUrl,
+  image: propImage,
+  radius: propRadius,
+  onImageUrlChange,
+  onImageChange,
+  onRadiusChange
+}) {
+  const [image, setImage] = useState(propImage || null)
+  const [imageUrl, setImageUrl] = useState(propImageUrl || null)
+  const [radius, setRadius] = useState(propRadius !== undefined ? propRadius : 10)
   const [pickedColor, setPickedColor] = useState(null)
   const [concentration, setConcentration] = useState(null)
   const [cursorPos, setCursorPos] = useState(null)
@@ -12,6 +20,19 @@ function Step2({ regressionData }) {
   const imageRef = useRef(null)
   const containerRef = useRef(null)
   const [imageError, setImageError] = useState(null)
+
+  // Sync local state with props when they change from parent
+  useEffect(() => {
+    if (propImageUrl !== imageUrl) {
+      if (propImageUrl === null && imageUrl) {
+        // Clean up old object URL
+        URL.revokeObjectURL(imageUrl)
+      }
+      setImageUrl(propImageUrl)
+    }
+    if (propImage !== image) setImage(propImage)
+    if (propRadius !== undefined && propRadius !== radius) setRadius(propRadius)
+  }, [propImageUrl, propImage, propRadius])
 
   useEffect(() => {
     if (imageUrl && canvasRef.current) {
@@ -36,12 +57,19 @@ function Step2({ regressionData }) {
   const handleFileChange = (e) => {
     const file = e.target.files[0]
     if (file && file.type.startsWith('image/')) {
+      // Clean up old object URL if exists
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl)
+      }
       const url = URL.createObjectURL(file)
       setImageUrl(url)
       setImage(file)
       setImageError(null)
       setPickedColor(null)
       setConcentration(null)
+      // Update parent immediately
+      if (onImageUrlChange) onImageUrlChange(url)
+      if (onImageChange) onImageChange(file)
     } else {
       setImageError('Please select a valid image file')
     }
@@ -170,7 +198,11 @@ function Step2({ regressionData }) {
                 <input
                   type="number"
                   value={radius}
-                  onChange={(e) => setRadius(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => {
+                    const newRadius = Math.max(0, Number(e.target.value))
+                    setRadius(newRadius)
+                    if (onRadiusChange) onRadiusChange(newRadius)
+                  }}
                   min="0"
                   step="1"
                 />

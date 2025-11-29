@@ -1,14 +1,34 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, ComposedChart, Legend } from 'recharts'
 import './Step1.css'
 
-function Step1({ onComplete }) {
-  const [data, setData] = useState(null)
-  const [m, setM] = useState(0)
-  const [n, setN] = useState(0)
-  const [xLabel, setXLabel] = useState('Concentration(μM)')
-  const [yLabel, setYLabel] = useState('B/R ratio')
+function Step1({ 
+  data: propData, 
+  m: propM, 
+  n: propN, 
+  xLabel: propXLabel, 
+  yLabel: propYLabel,
+  onDataChange,
+  onMChange,
+  onNChange,
+  onXLabelChange,
+  onYLabelChange
+}) {
+  const [data, setData] = useState(propData || null)
+  const [m, setM] = useState(propM || 0)
+  const [n, setN] = useState(propN || 0)
+  const [xLabel, setXLabel] = useState(propXLabel || 'Concentration(μM)')
+  const [yLabel, setYLabel] = useState(propYLabel || 'B/R ratio')
   const [fileError, setFileError] = useState(null)
+
+  // Sync local state with props when they change from parent
+  useEffect(() => {
+    if (propData !== null && propData !== data) setData(propData)
+    if (propM !== m) setM(propM)
+    if (propN !== n) setN(propN)
+    if (propXLabel !== xLabel) setXLabel(propXLabel)
+    if (propYLabel !== yLabel) setYLabel(propYLabel)
+  }, [propData, propM, propN, propXLabel, propYLabel])
 
   const parseJSONFile = useCallback((file) => {
     const reader = new FileReader()
@@ -72,6 +92,7 @@ function Step1({ onComplete }) {
     }
 
     setData(tuples)
+    if (onDataChange) onDataChange(tuples)
     performRegression(tuples)
   }
 
@@ -101,6 +122,9 @@ function Step1({ onComplete }) {
 
     setM(calculatedM)
     setN(calculatedN)
+    // Update parent immediately after regression
+    if (onMChange) onMChange(calculatedM)
+    if (onNChange) onNChange(calculatedN)
   }
 
   const handleFileChange = (e) => {
@@ -109,18 +133,6 @@ function Step1({ onComplete }) {
       parseJSONFile(file)
     } else {
       setFileError('Please select a valid JSON file')
-    }
-  }
-
-  const handleContinue = () => {
-    if (data && m !== null && n !== null) {
-      onComplete({
-        m,
-        n,
-        xLabel,
-        yLabel,
-        dataPoints: data
-      })
     }
   }
 
@@ -179,7 +191,11 @@ function Step1({ onComplete }) {
                 <input
                   type="number"
                   value={m}
-                  onChange={(e) => setM(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newM = Number(e.target.value)
+                    setM(newM)
+                    if (onMChange) onMChange(newM)
+                  }}
                   step="any"
                 />
               </label>
@@ -188,7 +204,11 @@ function Step1({ onComplete }) {
                 <input
                   type="number"
                   value={n}
-                  onChange={(e) => setN(Number(e.target.value))}
+                  onChange={(e) => {
+                    const newN = Number(e.target.value)
+                    setN(newN)
+                    if (onNChange) onNChange(newN)
+                  }}
                   step="any"
                 />
               </label>
@@ -209,7 +229,11 @@ function Step1({ onComplete }) {
                 <input
                   type="text"
                   value={xLabel}
-                  onChange={(e) => setXLabel(e.target.value)}
+                  onChange={(e) => {
+                    const newLabel = e.target.value
+                    setXLabel(newLabel)
+                    if (onXLabelChange) onXLabelChange(newLabel)
+                  }}
                 />
               </label>
               <label>
@@ -217,7 +241,11 @@ function Step1({ onComplete }) {
                 <input
                   type="text"
                   value={yLabel}
-                  onChange={(e) => setYLabel(e.target.value)}
+                  onChange={(e) => {
+                    const newLabel = e.target.value
+                    setYLabel(newLabel)
+                    if (onYLabelChange) onYLabelChange(newLabel)
+                  }}
                 />
               </label>
             </div>
@@ -266,12 +294,6 @@ function Step1({ onComplete }) {
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-          </div>
-
-          <div className="step1-section">
-            <button onClick={handleContinue} className="continue-btn">
-              Continue to Step 2
-            </button>
           </div>
         </>
       )}

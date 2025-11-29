@@ -128,21 +128,6 @@
   border-radius: 4px;
 }
 
-.continue-btn {
-  width: 100%;
-  padding: 1rem;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  transition: background 0.3s;
-}
-
-.continue-btn:hover {
-  background: #45a049;
-}
 
 @media (max-width: 768px) {
   .step1-section {
