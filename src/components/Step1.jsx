@@ -330,6 +330,7 @@ function Step1({
                     stroke="#ff7300"
                     strokeWidth={2}
                     dot={false}
+                    activeDot={false}
                     name="Regression Line"
                     data={regressionLine}
                     isAnimationActive={false}
