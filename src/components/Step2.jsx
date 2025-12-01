@@ -20,6 +20,21 @@ function Step2({
   const imageRef = useRef(null)
   const containerRef = useRef(null)
   const [imageError, setImageError] = useState(null)
+  
+  // Radius drag state
+  const [isDraggingRadius, setIsDraggingRadius] = useState(false)
+  const [radiusDragStart, setRadiusDragStart] = useState({ y: 0, initialRadius: 0 })
+  const radiusInputRef = useRef(null)
+  
+  // Image zoom and pan state
+  const [zoom, setZoom] = useState(1)
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  
+  // Touch gesture state
+  const [touchStart, setTouchStart] = useState(null)
+  const [pinchStart, setPinchStart] = useState(null)
 
   // Sync local state with props when they change from parent
   useEffect(() => {
@@ -45,6 +60,9 @@ function Step2({
         canvas.height = img.height
         ctx.drawImage(img, 0, 0)
         imageRef.current = img
+        // Reset zoom and pan when new image loads
+        setZoom(1)
+        setPanOffset({ x: 0, y: 0 })
       }
       img.onerror = () => {
         setImageError('Failed to load image')
@@ -52,6 +70,21 @@ function Step2({
       img.src = imageUrl
     }
   }, [imageUrl])
+
+  // Helper to calculate distance between two touches
+  const getTouchDistance = (touch1, touch2) => {
+    const dx = touch2.clientX - touch1.clientX
+    const dy = touch2.clientY - touch1.clientY
+    return Math.sqrt(dx * dx + dy * dy)
+  }
+
+  // Helper to get midpoint of two touches
+  const getTouchMidpoint = (touch1, touch2) => {
+    return {
+      x: (touch1.clientX + touch2.clientX) / 2,
+      y: (touch1.clientY + touch2.clientY) / 2
+    }
+  }
 
 
   const handleFileChange = (e) => {
@@ -115,18 +148,34 @@ function Step2({
     }
   }
 
+  // Convert screen coordinates to canvas coordinates accounting for zoom and pan
+  const screenToCanvas = (clientX, clientY) => {
+    if (!canvasRef.current || !containerRef.current) return { x: 0, y: 0 }
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    const containerRect = container.getBoundingClientRect()
+    
+    // Get position relative to container
+    const relativeX = clientX - containerRect.left
+    const relativeY = clientY - containerRect.top
+    
+    // Account for pan offset (pan moves the image within container)
+    const imageX = relativeX - panOffset.x
+    const imageY = relativeY - panOffset.y
+    
+    // Convert to canvas coordinates accounting for zoom
+    // The canvas is scaled by zoom, so we divide by zoom to get original canvas coordinates
+    const canvasX = imageX / zoom
+    const canvasY = imageY / zoom
+    
+    return { x: canvasX, y: canvasY }
+  }
+
   const handleCanvasClick = (e) => {
     if (!canvasRef.current || !imageRef.current || !regressionData) return
 
     const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-    
-    // Calculate the scale factor based on actual displayed size vs natural size
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    
-    const x = (e.clientX - rect.left) * scaleX
-    const y = (e.clientY - rect.top) * scaleY
+    const { x, y } = screenToCanvas(e.clientX, e.clientY)
 
     // Clamp coordinates to canvas bounds
     const clampedX = Math.max(0, Math.min(canvas.width - 1, Math.round(x)))
@@ -145,6 +194,9 @@ function Step2({
     const calculatedConcentration = m * brRatio + n
 
     setConcentration(calculatedConcentration)
+    
+    // Update cursor position (screen coordinates)
+    const rect = canvas.getBoundingClientRect()
     setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
   }
 
@@ -155,6 +207,262 @@ function Step2({
     setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
   }
 
+  // Radius drag handlers
+  const handleRadiusDragStart = (e) => {
+    if (e.touches && e.touches.length === 1) {
+      e.preventDefault()
+      setIsDraggingRadius(true)
+      setRadiusDragStart({
+        y: e.touches[0].clientY,
+        initialRadius: radius
+      })
+    } else if (e.type === 'mousedown' && e.button === 0) {
+      setIsDraggingRadius(true)
+      setRadiusDragStart({
+        y: e.clientY,
+        initialRadius: radius
+      })
+    }
+  }
+
+  const handleRadiusDrag = (e) => {
+    if (!isDraggingRadius) return
+    
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const deltaY = radiusDragStart.y - clientY // Inverted: drag up increases
+    const sensitivity = 0.5
+    const newRadius = Math.max(0, Math.round(radiusDragStart.initialRadius + deltaY * sensitivity))
+    
+    setRadius(newRadius)
+    if (onRadiusChange) onRadiusChange(newRadius)
+  }
+
+  const handleRadiusDragEnd = () => {
+    setIsDraggingRadius(false)
+  }
+
+  // Image pan handlers
+  const handlePanStart = (e) => {
+    const container = containerRef.current
+    const canvas = canvasRef.current
+    if (!container || !canvas) return
+    
+    // Only allow panning if zoomed image is larger than container
+    const containerRect = container.getBoundingClientRect()
+    const scaledWidth = canvas.width * zoom
+    const scaledHeight = canvas.height * zoom
+    const canPan = scaledWidth > containerRect.width || scaledHeight > containerRect.height
+    
+    if (!canPan) return
+    
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    
+    e.preventDefault()
+    setIsPanning(true)
+    const containerRect2 = container.getBoundingClientRect()
+    setPanStart({
+      x: clientX - containerRect2.left - panOffset.x,
+      y: clientY - containerRect2.top - panOffset.y
+    })
+  }
+
+  const handlePan = (e) => {
+    if (!isPanning) return
+    
+    const container = containerRef.current
+    const canvas = canvasRef.current
+    if (!container || !canvas) return
+    
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    
+    const containerRect = container.getBoundingClientRect()
+    const newOffsetX = clientX - containerRect.left - panStart.x
+    const newOffsetY = clientY - containerRect.top - panStart.y
+    
+    // Constrain panning to keep image within bounds
+    const scaledWidth = canvas.width * zoom
+    const scaledHeight = canvas.height * zoom
+    const maxOffsetX = Math.max(0, (scaledWidth - containerRect.width) / 2)
+    const maxOffsetY = Math.max(0, (scaledHeight - containerRect.height) / 2)
+    
+    const constrainedX = Math.max(-maxOffsetX, Math.min(maxOffsetX, newOffsetX))
+    const constrainedY = Math.max(-maxOffsetY, Math.min(maxOffsetY, newOffsetY))
+    
+    setPanOffset({ x: constrainedX, y: constrainedY })
+  }
+
+  const handlePanEnd = () => {
+    setIsPanning(false)
+  }
+
+  // Pinch zoom handlers
+  const handlePinchStart = (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault()
+      const distance = getTouchDistance(e.touches[0], e.touches[1])
+      const midpoint = getTouchMidpoint(e.touches[0], e.touches[1])
+      setPinchStart({
+        distance,
+        midpoint,
+        zoom,
+        panOffset
+      })
+    }
+  }
+
+  const handlePinch = (e) => {
+    if (!pinchStart || e.touches.length !== 2) return
+    
+    e.preventDefault()
+    const distance = getTouchDistance(e.touches[0], e.touches[1])
+    const scale = distance / pinchStart.distance
+    const newZoom = Math.max(1, Math.min(5, pinchStart.zoom * scale)) // Limit zoom between 1x and 5x
+    
+    // Adjust pan to zoom towards pinch midpoint
+    const currentMidpoint = getTouchMidpoint(e.touches[0], e.touches[1])
+    const container = containerRef.current
+    if (container) {
+      const containerRect = container.getBoundingClientRect()
+      const midpointRelativeX = currentMidpoint.x - containerRect.left
+      const midpointRelativeY = currentMidpoint.y - containerRect.top
+      
+      // Calculate new pan offset to keep midpoint in same screen position
+      const zoomRatio = newZoom / pinchStart.zoom
+      const newOffsetX = midpointRelativeX - (midpointRelativeX - pinchStart.panOffset.x) * zoomRatio
+      const newOffsetY = midpointRelativeY - (midpointRelativeY - pinchStart.panOffset.y) * zoomRatio
+      
+      setZoom(newZoom)
+      setPanOffset({ x: newOffsetX, y: newOffsetY })
+    } else {
+      setZoom(newZoom)
+    }
+  }
+
+  const handlePinchEnd = () => {
+    setPinchStart(null)
+  }
+
+  // Touch handlers that differentiate tap, drag, and pinch
+  const handleCanvasTouchStart = (e) => {
+    if (!canvasRef.current || !imageRef.current) return
+    
+    if (e.touches.length === 2) {
+      // Two fingers = pinch zoom
+      handlePinchStart(e)
+      setTouchStart(null) // Cancel any tap/drag
+    } else if (e.touches.length === 1) {
+      // Single finger = tap or drag
+      const touch = e.touches[0]
+      setTouchStart({
+        x: touch.clientX,
+        y: touch.clientY,
+        time: Date.now()
+      })
+    }
+  }
+
+  const handleCanvasTouchMove = (e) => {
+    if (!canvasRef.current || !imageRef.current) return
+    
+    if (e.touches.length === 2) {
+      // Pinch zoom
+      handlePinch(e)
+      setTouchStart(null) // Cancel tap/drag
+    } else if (e.touches.length === 1 && touchStart) {
+      // Check if this is a drag (movement threshold)
+      const touch = e.touches[0]
+      const deltaX = Math.abs(touch.clientX - touchStart.x)
+      const deltaY = Math.abs(touch.clientY - touchStart.y)
+      const threshold = 10 // pixels
+      
+      if (deltaX > threshold || deltaY > threshold) {
+        // It's a drag - start panning
+        e.preventDefault()
+        if (!isPanning) {
+          // Start panning
+          handlePanStart(e)
+        }
+        handlePan(e)
+        setTouchStart(null) // Cancel tap
+      }
+    }
+  }
+
+  const handleCanvasTouchEnd = (e) => {
+    // Check if it was a tap (not a drag or pinch)
+    if (touchStart && e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0]
+      const deltaX = Math.abs(touch.clientX - touchStart.x)
+      const deltaY = Math.abs(touch.clientY - touchStart.y)
+      const deltaTime = Date.now() - touchStart.time
+      const threshold = 10 // pixels
+      const timeThreshold = 300 // ms
+      
+      if (deltaX < threshold && deltaY < threshold && deltaTime < timeThreshold) {
+        // It's a tap - pick color
+        e.preventDefault()
+        const syntheticEvent = {
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        }
+        handleCanvasClick(syntheticEvent)
+      }
+    }
+    
+    handlePanEnd()
+    handlePinchEnd()
+    setTouchStart(null)
+    
+    // Update cursor position if there's still a touch
+    if (e.touches && e.touches.length === 1) {
+      const touch = e.touches[0]
+      const syntheticEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      }
+      handleCanvasMove(syntheticEvent)
+    } else if (e.touches.length === 0) {
+      setCursorPos(null)
+    }
+  }
+
+  // Global event listeners for drag operations
+  useEffect(() => {
+    const handleGlobalMove = (e) => {
+      if (isDraggingRadius) {
+        handleRadiusDrag(e)
+      }
+      if (isPanning) {
+        handlePan(e)
+      }
+    }
+
+    const handleGlobalEnd = () => {
+      if (isDraggingRadius) {
+        handleRadiusDragEnd()
+      }
+      if (isPanning) {
+        handlePanEnd()
+      }
+    }
+
+    if (isDraggingRadius || isPanning) {
+      window.addEventListener('touchmove', handleGlobalMove, { passive: false })
+      window.addEventListener('touchend', handleGlobalEnd)
+      window.addEventListener('mousemove', handleGlobalMove)
+      window.addEventListener('mouseup', handleGlobalEnd)
+    }
+
+    return () => {
+      window.removeEventListener('touchmove', handleGlobalMove)
+      window.removeEventListener('touchend', handleGlobalEnd)
+      window.removeEventListener('mousemove', handleGlobalMove)
+      window.removeEventListener('mouseup', handleGlobalEnd)
+    }
+  }, [isDraggingRadius, isPanning, radiusDragStart, panStart, radius, panOffset, zoom])
+
   const getDisplayRadius = () => {
     if (!canvasRef.current || !imageRef.current) return radius
     const canvas = canvasRef.current
@@ -162,13 +470,23 @@ function Step2({
     if (rect.width === 0 || rect.height === 0 || canvas.width === 0 || canvas.height === 0) {
       return radius
     }
-    const scaleX = rect.width / canvas.width
-    const scaleY = rect.height / canvas.height
+    // Account for zoom
+    const scaleX = (rect.width / canvas.width) * zoom
+    const scaleY = (rect.height / canvas.height) * zoom
     const avgScale = (scaleX + scaleY) / 2
     return radius * avgScale
   }
 
   const displayRadius = getDisplayRadius()
+
+  // Get canvas transform for zoom and pan
+  const getCanvasTransform = () => {
+    if (zoom === 1 && panOffset.x === 0 && panOffset.y === 0) return {}
+    return {
+      transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
+      transformOrigin: 'top left'
+    }
+  }
 
   return (
     <div className="step2-container">
@@ -196,6 +514,7 @@ function Step2({
               <label>
                 Picker Radius:
                 <input
+                  ref={radiusInputRef}
                   type="number"
                   value={radius}
                   onChange={(e) => {
@@ -203,48 +522,42 @@ function Step2({
                     setRadius(newRadius)
                     if (onRadiusChange) onRadiusChange(newRadius)
                   }}
+                  onTouchStart={handleRadiusDragStart}
+                  onMouseDown={handleRadiusDragStart}
                   min="0"
                   step="1"
+                  className="radius-input-draggable"
                 />
                 {radius === 0 && <span className="hint"> (Point picker)</span>}
+                <span className="hint"> (Hold and drag up/down to adjust)</span>
               </label>
             </div>
           </div>
 
           <div className="step2-section">
             <div className="image-container" ref={containerRef}>
-              <div className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
+              <div className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
                 <canvas
                   ref={canvasRef}
                   onClick={handleCanvasClick}
                   onMouseMove={handleCanvasMove}
-                  onTouchStart={(e) => {
-                    e.preventDefault()
-                    const touch = e.touches[0]
-                    const syntheticEvent = {
-                      clientX: touch.clientX,
-                      clientY: touch.clientY
-                    }
-                    handleCanvasClick(syntheticEvent)
+                  onMouseDown={(e) => {
+                    handlePanStart(e)
                   }}
-                  onTouchMove={(e) => {
-                    e.preventDefault()
-                    const touch = e.touches[0]
-                    const syntheticEvent = {
-                      clientX: touch.clientX,
-                      clientY: touch.clientY
-                    }
-                    handleCanvasMove(syntheticEvent)
-                  }}
+                  onTouchStart={handleCanvasTouchStart}
+                  onTouchMove={handleCanvasTouchMove}
+                  onTouchEnd={handleCanvasTouchEnd}
                   style={{
                     maxWidth: '100%',
                     height: 'auto',
-                    cursor: 'crosshair',
+                    cursor: isPanning ? 'grabbing' : (zoom > 1 ? 'grab' : 'crosshair'),
                     display: 'block',
-                    touchAction: 'none'
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    ...getCanvasTransform()
                   }}
                 />
-                {cursorPos && (
+                {cursorPos && !isPanning && (
                   <div
                     className="picker-circle"
                     style={{
@@ -262,7 +575,11 @@ function Step2({
                 )}
               </div>
             </div>
-            <p className="instruction">Click or tap on the image to pick a color</p>
+            <p className="instruction">
+              {zoom > 1 
+                ? 'Drag to pan • Pinch to zoom • Tap to pick color'
+                : 'Click or tap on the image to pick a color • Drag image if too large • Pinch to zoom'}
+            </p>
           </div>
 
           {pickedColor && (

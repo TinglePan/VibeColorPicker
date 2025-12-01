@@ -44,6 +44,17 @@
   width: 100px;
 }
 
+.radius-input-draggable {
+  cursor: ns-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.radius-input-draggable:active {
+  background-color: #f0f0f0;
+}
+
 .hint {
   color: #666;
   font-size: 0.9rem;
@@ -54,11 +65,12 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  overflow: auto;
+  overflow: hidden;
   max-height: 70vh;
   background: #f5f5f5;
   padding: 1rem;
   border-radius: 4px;
+  position: relative;
 }
 
 .canvas-wrapper {
