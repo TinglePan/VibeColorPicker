@@ -44,17 +44,6 @@
   width: 100px;
 }
 
-.radius-input-draggable {
-  cursor: ns-resize;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-}
-
-.radius-input-draggable:active {
-  background-color: #f0f0f0;
-}
-
 .hint {
   color: #666;
   font-size: 0.9rem;

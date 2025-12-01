@@ -20,21 +20,6 @@ function Step2({
   const imageRef = useRef(null)
   const containerRef = useRef(null)
   const [imageError, setImageError] = useState(null)
-  
-  // Image panning state
-  const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 })
-  const [isPanning, setIsPanning] = useState(false)
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
-  
-  // Radius drag state
-  const [isDraggingRadius, setIsDraggingRadius] = useState(false)
-  const [radiusDragStart, setRadiusDragStart] = useState({ y: 0, initialRadius: 0 })
-  const radiusInputRef = useRef(null)
-  
-  // Pinch gesture state
-  const [pinchStartDistance, setPinchStartDistance] = useState(null)
-  const [pinchStartRadius, setPinchStartRadius] = useState(null)
-  const lastTouchRef = useRef({ touches: [] })
 
   // Sync local state with props when they change from parent
   useEffect(() => {
@@ -49,7 +34,6 @@ function Step2({
     if (propRadius !== undefined && propRadius !== radius) setRadius(propRadius)
   }, [propImageUrl, propImage, propRadius])
 
-
   useEffect(() => {
     if (imageUrl && canvasRef.current) {
       const img = new Image()
@@ -61,8 +45,6 @@ function Step2({
         canvas.height = img.height
         ctx.drawImage(img, 0, 0)
         imageRef.current = img
-        // Reset offset when new image loads
-        setImageOffset({ x: 0, y: 0 })
       }
       img.onerror = () => {
         setImageError('Failed to load image')
@@ -70,13 +52,6 @@ function Step2({
       img.src = imageUrl
     }
   }, [imageUrl])
-
-  // Helper to calculate distance between two touches
-  const getTouchDistance = (touch1, touch2) => {
-    const dx = touch2.clientX - touch1.clientX
-    const dy = touch2.clientY - touch1.clientY
-    return Math.sqrt(dx * dx + dy * dy)
-  }
 
 
   const handleFileChange = (e) => {
@@ -150,12 +125,8 @@ function Step2({
     const scaleX = canvas.width / rect.width
     const scaleY = canvas.height / rect.height
     
-    // Account for image offset when panning
-    const offsetX = imageOffset.x || 0
-    const offsetY = imageOffset.y || 0
-    
-    const x = (e.clientX - rect.left - offsetX) * scaleX
-    const y = (e.clientY - rect.top - offsetY) * scaleY
+    const x = (e.clientX - rect.left) * scaleX
+    const y = (e.clientY - rect.top) * scaleY
 
     // Clamp coordinates to canvas bounds
     const clampedX = Math.max(0, Math.min(canvas.width - 1, Math.round(x)))
@@ -184,196 +155,6 @@ function Step2({
     setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
   }
 
-  // Radius input drag handlers
-  const handleRadiusDragStart = (e) => {
-    if (e.touches && e.touches.length === 1) {
-      e.preventDefault()
-      setIsDraggingRadius(true)
-      setRadiusDragStart({
-        y: e.touches[0].clientY,
-        initialRadius: radius
-      })
-    } else if (e.type === 'mousedown' && e.button === 0) {
-      setIsDraggingRadius(true)
-      setRadiusDragStart({
-        y: e.clientY,
-        initialRadius: radius
-      })
-    }
-  }
-
-  const handleRadiusDrag = (e) => {
-    if (!isDraggingRadius) return
-    
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
-    const deltaY = radiusDragStart.y - clientY // Inverted: drag up increases
-    const sensitivity = 0.5 // Adjust sensitivity
-    const newRadius = Math.max(0, Math.round(radiusDragStart.initialRadius + deltaY * sensitivity))
-    
-    setRadius(newRadius)
-    if (onRadiusChange) onRadiusChange(newRadius)
-  }
-
-  const handleRadiusDragEnd = () => {
-    setIsDraggingRadius(false)
-  }
-
-  // Image panning handlers
-  const handlePanStart = (e) => {
-    if (!canvasRef.current || !imageRef.current) return
-    
-    const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-    
-    // Check if displayed image is larger than container (needs panning)
-    const container = containerRef.current
-    if (!container) return
-    
-    const needsPanning = rect.width > container.clientWidth || rect.height > container.clientHeight
-    if (!needsPanning) return
-    
-    if (e.touches && e.touches.length === 1) {
-      e.preventDefault()
-      setIsPanning(true)
-      setPanStart({
-        x: e.touches[0].clientX - imageOffset.x,
-        y: e.touches[0].clientY - imageOffset.y
-      })
-    } else if (e.type === 'mousedown' && e.button === 0) {
-      setIsPanning(true)
-      setPanStart({
-        x: e.clientX - imageOffset.x,
-        y: e.clientY - imageOffset.y
-      })
-    }
-  }
-
-  const handlePan = (e) => {
-    if (!isPanning || !containerRef.current) return
-    
-    const container = containerRef.current
-    const canvas = canvasRef.current
-    if (!canvas) return
-    
-    const rect = canvas.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
-    
-    let newX = clientX - panStart.x
-    let newY = clientY - panStart.y
-    
-    // Constrain panning within bounds (based on displayed size)
-    const maxX = Math.max(0, rect.width - container.clientWidth)
-    const maxY = Math.max(0, rect.height - container.clientHeight)
-    
-    newX = Math.max(-maxX, Math.min(0, newX))
-    newY = Math.max(-maxY, Math.min(0, newY))
-    
-    setImageOffset({ x: newX, y: newY })
-  }
-
-  const handlePanEnd = () => {
-    setIsPanning(false)
-  }
-
-  // Pinch gesture handler for radius
-  const handlePinchStart = (e) => {
-    if (e.touches && e.touches.length === 2) {
-      e.preventDefault()
-      const distance = getTouchDistance(e.touches[0], e.touches[1])
-      setPinchStartDistance(distance)
-      setPinchStartRadius(radius)
-      lastTouchRef.current = { touches: Array.from(e.touches) }
-    }
-  }
-
-  const handlePinch = (e) => {
-    if (!pinchStartDistance || !e.touches || e.touches.length !== 2) return
-    
-    e.preventDefault()
-    const distance = getTouchDistance(e.touches[0], e.touches[1])
-    const scale = distance / pinchStartDistance
-    
-    const newRadius = Math.max(0, Math.round(pinchStartRadius * scale))
-    setRadius(newRadius)
-    if (onRadiusChange) onRadiusChange(newRadius)
-    
-    lastTouchRef.current = { touches: Array.from(e.touches) }
-  }
-
-  const handlePinchEnd = () => {
-    setPinchStartDistance(null)
-    setPinchStartRadius(null)
-  }
-
-  // Combined touch handler for canvas
-  const handleCanvasTouchStart = (e) => {
-    if (!canvasRef.current || !imageRef.current) return
-    
-    if (e.touches.length === 2) {
-      // Two fingers = pinch for radius
-      handlePinchStart(e)
-    } else if (e.touches.length === 1) {
-      // Single finger = check if panning or picking color
-      const container = containerRef.current
-      const canvas = canvasRef.current
-      if (canvas && container) {
-        const rect = canvas.getBoundingClientRect()
-        if (rect.width > container.clientWidth || rect.height > container.clientHeight) {
-          // Displayed image is larger, allow panning
-          handlePanStart(e)
-          return
-        }
-      }
-      // Normal color pick (requires regressionData)
-      if (regressionData) {
-        e.preventDefault()
-        const touch = e.touches[0]
-        const syntheticEvent = {
-          clientX: touch.clientX,
-          clientY: touch.clientY
-        }
-        handleCanvasClick(syntheticEvent)
-      }
-    }
-  }
-
-  const handleCanvasTouchMove = (e) => {
-    if (!canvasRef.current || !imageRef.current) return
-    
-    if (e.touches.length === 2) {
-      handlePinch(e)
-    } else if (e.touches.length === 1) {
-      if (isPanning) {
-        handlePan(e)
-      } else {
-        const touch = e.touches[0]
-        const syntheticEvent = {
-          clientX: touch.clientX,
-          clientY: touch.clientY
-        }
-        handleCanvasMove(syntheticEvent)
-      }
-    }
-  }
-
-  const handleCanvasTouchEnd = (e) => {
-    handlePanEnd()
-    handlePinchEnd()
-    
-    // If there's still one touch, update cursor position
-    if (e.touches && e.touches.length === 1) {
-      const touch = e.touches[0]
-      const syntheticEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY
-      }
-      handleCanvasMove(syntheticEvent)
-    } else if (e.touches.length === 0) {
-      setCursorPos(null)
-    }
-  }
-
   const getDisplayRadius = () => {
     if (!canvasRef.current || !imageRef.current) return radius
     const canvas = canvasRef.current
@@ -388,49 +169,6 @@ function Step2({
   }
 
   const displayRadius = getDisplayRadius()
-
-  // Apply image offset for panning
-  const getCanvasTransform = () => {
-    if (imageOffset.x === 0 && imageOffset.y === 0) return {}
-    return {
-      transform: `translate(${imageOffset.x}px, ${imageOffset.y}px)`
-    }
-  }
-
-  // Global event listeners for drag operations
-  useEffect(() => {
-    const handleGlobalMove = (e) => {
-      if (isDraggingRadius) {
-        handleRadiusDrag(e)
-      }
-      if (isPanning) {
-        handlePan(e)
-      }
-    }
-
-    const handleGlobalEnd = () => {
-      if (isDraggingRadius) {
-        handleRadiusDragEnd()
-      }
-      if (isPanning) {
-        handlePanEnd()
-      }
-    }
-
-    if (isDraggingRadius || isPanning) {
-      window.addEventListener('touchmove', handleGlobalMove, { passive: false })
-      window.addEventListener('touchend', handleGlobalEnd)
-      window.addEventListener('mousemove', handleGlobalMove)
-      window.addEventListener('mouseup', handleGlobalEnd)
-    }
-
-    return () => {
-      window.removeEventListener('touchmove', handleGlobalMove)
-      window.removeEventListener('touchend', handleGlobalEnd)
-      window.removeEventListener('mousemove', handleGlobalMove)
-      window.removeEventListener('mouseup', handleGlobalEnd)
-    }
-  }, [isDraggingRadius, isPanning])
 
   return (
     <div className="step2-container">
@@ -458,7 +196,6 @@ function Step2({
               <label>
                 Picker Radius:
                 <input
-                  ref={radiusInputRef}
                   type="number"
                   value={radius}
                   onChange={(e) => {
@@ -466,42 +203,48 @@ function Step2({
                     setRadius(newRadius)
                     if (onRadiusChange) onRadiusChange(newRadius)
                   }}
-                  onTouchStart={handleRadiusDragStart}
-                  onMouseDown={handleRadiusDragStart}
                   min="0"
                   step="1"
-                  className="radius-input-draggable"
                 />
                 {radius === 0 && <span className="hint"> (Point picker)</span>}
-                <span className="hint"> (Hold and drag up/down to adjust)</span>
               </label>
             </div>
           </div>
 
           <div className="step2-section">
             <div className="image-container" ref={containerRef}>
-              <div className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
+              <div className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
                 <canvas
                   ref={canvasRef}
-                  onClick={(e) => {
-                    if (!isPanning) handleCanvasClick(e)
-                  }}
+                  onClick={handleCanvasClick}
                   onMouseMove={handleCanvasMove}
-                  onMouseDown={handlePanStart}
-                  onTouchStart={handleCanvasTouchStart}
-                  onTouchMove={handleCanvasTouchMove}
-                  onTouchEnd={handleCanvasTouchEnd}
+                  onTouchStart={(e) => {
+                    e.preventDefault()
+                    const touch = e.touches[0]
+                    const syntheticEvent = {
+                      clientX: touch.clientX,
+                      clientY: touch.clientY
+                    }
+                    handleCanvasClick(syntheticEvent)
+                  }}
+                  onTouchMove={(e) => {
+                    e.preventDefault()
+                    const touch = e.touches[0]
+                    const syntheticEvent = {
+                      clientX: touch.clientX,
+                      clientY: touch.clientY
+                    }
+                    handleCanvasMove(syntheticEvent)
+                  }}
                   style={{
                     maxWidth: '100%',
                     height: 'auto',
-                    cursor: isPanning ? 'grabbing' : 'crosshair',
+                    cursor: 'crosshair',
                     display: 'block',
-                    touchAction: 'none',
-                    userSelect: 'none',
-                    ...getCanvasTransform()
+                    touchAction: 'none'
                   }}
                 />
-                {cursorPos && !isPanning && (
+                {cursorPos && (
                   <div
                     className="picker-circle"
                     style={{
