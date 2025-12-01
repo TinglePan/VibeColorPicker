@@ -19,6 +19,7 @@ function Step2({
   const canvasRef = useRef(null)
   const imageRef = useRef(null)
   const containerRef = useRef(null)
+  const canvasWrapperRef = useRef(null)
   const [imageError, setImageError] = useState(null)
   
   // Radius drag state
@@ -171,6 +172,18 @@ function Step2({
     return { x: canvasX, y: canvasY }
   }
 
+  // Helper to update cursor position relative to canvas-wrapper
+  const updateCursorPos = (clientX, clientY) => {
+    if (!canvasWrapperRef.current) return
+    const wrapperRect = canvasWrapperRef.current.getBoundingClientRect()
+    
+    // Get position relative to canvas-wrapper (where the circle will be positioned)
+    setCursorPos({ 
+      x: clientX - wrapperRect.left, 
+      y: clientY - wrapperRect.top 
+    })
+  }
+
   const handleCanvasClick = (e) => {
     if (!canvasRef.current || !imageRef.current || !regressionData) return
 
@@ -195,16 +208,13 @@ function Step2({
 
     setConcentration(calculatedConcentration)
     
-    // Update cursor position (screen coordinates)
-    const rect = canvas.getBoundingClientRect()
-    setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    // Update cursor position relative to container
+    updateCursorPos(e.clientX, e.clientY)
   }
 
   const handleCanvasMove = (e) => {
     if (!canvasRef.current || !imageRef.current) return
-    const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-    setCursorPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    updateCursorPos(e.clientX, e.clientY)
   }
 
   // Radius drag handlers
@@ -352,6 +362,7 @@ function Step2({
       // Two fingers = pinch zoom
       handlePinchStart(e)
       setTouchStart(null) // Cancel any tap/drag
+      setCursorPos(null) // Hide cursor during pinch
     } else if (e.touches.length === 1) {
       // Single finger = tap or drag
       const touch = e.touches[0]
@@ -360,6 +371,8 @@ function Step2({
         y: touch.clientY,
         time: Date.now()
       })
+      // Update cursor position immediately
+      updateCursorPos(touch.clientX, touch.clientY)
     }
   }
 
@@ -386,7 +399,13 @@ function Step2({
         }
         handlePan(e)
         setTouchStart(null) // Cancel tap
+      } else {
+        // Still within threshold - update cursor position
+        updateCursorPos(touch.clientX, touch.clientY)
       }
+    } else if (e.touches.length === 1) {
+      // Update cursor position even when not dragging
+      updateCursorPos(e.touches[0].clientX, e.touches[0].clientY)
     }
   }
 
@@ -408,6 +427,7 @@ function Step2({
           clientY: touch.clientY
         }
         handleCanvasClick(syntheticEvent)
+        return // Don't clear cursor pos after tap
       }
     }
     
@@ -418,13 +438,10 @@ function Step2({
     // Update cursor position if there's still a touch
     if (e.touches && e.touches.length === 1) {
       const touch = e.touches[0]
-      const syntheticEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY
-      }
-      handleCanvasMove(syntheticEvent)
+      updateCursorPos(touch.clientX, touch.clientY)
     } else if (e.touches.length === 0) {
-      setCursorPos(null)
+      // Keep cursor pos visible after tap
+      // Only clear if explicitly needed
     }
   }
 
@@ -470,11 +487,14 @@ function Step2({
     if (rect.width === 0 || rect.height === 0 || canvas.width === 0 || canvas.height === 0) {
       return radius
     }
-    // Account for zoom
-    const scaleX = (rect.width / canvas.width) * zoom
-    const scaleY = (rect.height / canvas.height) * zoom
-    const avgScale = (scaleX + scaleY) / 2
-    return radius * avgScale
+    // Calculate the scale factor: displayed width / natural width
+    // The canvas is scaled by zoom via CSS transform, so we need to account for that
+    const naturalWidth = canvas.width
+    const displayedWidth = rect.width
+    const scale = displayedWidth / naturalWidth
+    
+    // The radius in canvas pixels needs to be scaled to display pixels
+    return radius * scale
   }
 
   const displayRadius = getDisplayRadius()
@@ -536,7 +556,7 @@ function Step2({
 
           <div className="step2-section">
             <div className="image-container" ref={containerRef}>
-              <div className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
+              <div ref={canvasWrapperRef} className="canvas-wrapper" style={{ position: 'relative', display: 'inline-block', overflow: 'hidden' }}>
                 <canvas
                   ref={canvasRef}
                   onClick={handleCanvasClick}
@@ -557,7 +577,7 @@ function Step2({
                     ...getCanvasTransform()
                   }}
                 />
-                {cursorPos && !isPanning && (
+                {cursorPos && !isPanning && !isDraggingRadius && (
                   <div
                     className="picker-circle"
                     style={{
@@ -569,7 +589,8 @@ function Step2({
                       border: '2px solid #4CAF50',
                       pointerEvents: 'none',
                       position: 'absolute',
-                      boxSizing: 'border-box'
+                      boxSizing: 'border-box',
+                      zIndex: 10
                     }}
                   />
                 )}
