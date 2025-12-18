@@ -10,8 +10,8 @@ function App() {
   const [step1Data, setStep1Data] = useState(null)
   const [step1M, setStep1M] = useState(0)
   const [step1N, setStep1N] = useState(0)
-  const [step1XLabel, setStep1XLabel] = useState('Concentration(μM)')
-  const [step1YLabel, setStep1YLabel] = useState('B/R ratio')
+  const [step1XLabel, setStep1XLabel] = useState('B/R ratio')
+  const [step1YLabel, setStep1YLabel] = useState('Concentration(μM)')
   
   // Step 2 state
   const [step2ImageUrl, setStep2ImageUrl] = useState(null)
