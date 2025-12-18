@@ -6,15 +6,15 @@ import './Step1.css'
 const CustomTooltip = ({ active, payload, label, m, n, xLabel, yLabel }) => {
   if (!active) return null
   
-  // Get x coordinate (B/R ratio) - label should be the x value
-  const brRatio = label !== null && label !== undefined && typeof label === 'number' ? label : null
+  // Get x coordinate (concentration/uM) - label should be the x value
+  const concentration = label !== null && label !== undefined && typeof label === 'number' ? label : null
   
   // Find scatter data point if hovering over one
   const scatterPayload = payload?.find(p => p.name === 'Data Points')
   
   // Always calculate regression line value if we have x coordinate
-  // Since concentration = m * brRatio + n
-  const regressionValue = brRatio !== null ? m * brRatio + n : null
+  // Since concentration = m * brRatio + n, we have brRatio = (concentration - n) / m
+  const regressionValue = concentration !== null && m !== 0 ? (concentration - n) / m : null
   
   return (
     <div style={{
@@ -24,19 +24,19 @@ const CustomTooltip = ({ active, payload, label, m, n, xLabel, yLabel }) => {
       padding: '8px',
       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
     }}>
-      {brRatio !== null && (
+      {concentration !== null && (
         <p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>
-          {xLabel}: {brRatio.toFixed(4)}
+          {xLabel}: {concentration.toFixed(2)}
         </p>
       )}
       {scatterPayload && scatterPayload.payload && (
         <p style={{ margin: '4px 0', color: '#8884d8' }}>
-          Data Point: {scatterPayload.payload.concentration?.toFixed(2) || 'N/A'}
+          Data Point: {scatterPayload.payload.brRatio?.toFixed(4) || 'N/A'}
         </p>
       )}
       {regressionValue !== null && (
         <p style={{ margin: '4px 0', color: '#ff7300' }}>
-          Regression Line: {regressionValue.toFixed(2)}
+          Regression Line: {regressionValue.toFixed(4)}
         </p>
       )}
     </div>
@@ -58,8 +58,8 @@ function Step1({
   const [data, setData] = useState(propData || null)
   const [m, setM] = useState(propM || 0)
   const [n, setN] = useState(propN || 0)
-  const [xLabel, setXLabel] = useState(propXLabel || 'B/R ratio')
-  const [yLabel, setYLabel] = useState(propYLabel || 'Concentration(μM)')
+  const [xLabel, setXLabel] = useState(propXLabel || 'Concentration(μM)')
+  const [yLabel, setYLabel] = useState(propYLabel || 'B/R ratio')
   const [fileError, setFileError] = useState(null)
 
   // Sync local state with props when they change from parent
@@ -181,26 +181,26 @@ function Step1({
   const getRegressionLine = () => {
     if (!data || data.length === 0) return []
     
-    const minBrRatio = Math.min(...data.map(d => d.brRatio))
-    const maxBrRatio = Math.max(...data.map(d => d.brRatio))
-    const padding = (maxBrRatio - minBrRatio) * 0.1 || 0.1
+    const minConc = Math.min(...data.map(d => d.concentration))
+    const maxConc = Math.max(...data.map(d => d.concentration))
+    const padding = (maxConc - minConc) * 0.1 || 0.1
     
     // Start from 0 to show the full line from origin
     const xStart = 0
-    const xEnd = maxBrRatio + padding
+    const xEnd = maxConc + padding
     
     // Generate multiple points along the regression line for accurate tooltips
     // Using 100 points for smooth interpolation
-    // Since concentration = m * brRatio + n
+    // Since concentration = m * brRatio + n, we have brRatio = (concentration - n) / m
     // Filter out points where either x or y is negative
     const numPoints = 100
     const points = []
     
     for (let i = 0; i <= numPoints; i++) {
-      const brRatio = xStart + (xEnd - xStart) * (i / numPoints)
-      const concentration = m * brRatio + n
+      const concentration = xStart + (xEnd - xStart) * (i / numPoints)
+      const brRatio = m !== 0 ? (concentration - n) / m : 0
       // Only include points where both x and y are >= 0
-      if (brRatio >= 0 && concentration >= 0) {
+      if (concentration >= 0 && brRatio >= 0) {
         points.push({ concentration, brRatio })
       }
     }
@@ -209,13 +209,16 @@ function Step1({
   }
 
   const chartData = data ? data.map(d => ({
-    x: d.brRatio,
-    y: d.concentration,
+    x: d.concentration,
+    y: d.brRatio,
     brRatio: d.brRatio,
     concentration: d.concentration
   })) : []
 
   const regressionLine = getRegressionLine()
+  
+  // Calculate minimum B/R ratio for Y-axis domain
+  const minBrRatio = data && data.length > 0 ? Math.min(...data.map(d => d.brRatio)) : 0
 
   return (
     <div className="step1-container">
@@ -310,16 +313,16 @@ function Step1({
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     type="number"
-                    dataKey="brRatio"
-                    name="B/R ratio"
+                    dataKey="concentration"
+                    name="Concentration"
                     domain={[0, 'auto']}
                     label={{ value: xLabel, position: 'insideBottom', offset: -5 }}
                   />
                   <YAxis
                     type="number"
-                    dataKey="concentration"
-                    name="Concentration"
-                    domain={[0, 'auto']}
+                    dataKey="brRatio"
+                    name="B/R ratio"
+                    domain={[minBrRatio, 'auto']}
                     label={{ value: yLabel, angle: -90, position: 'insideLeft' }}
                   />
                   <Tooltip
@@ -333,7 +336,7 @@ function Step1({
                   />
                   <Line
                     type="linear"
-                    dataKey="concentration"
+                    dataKey="brRatio"
                     stroke="#ff7300"
                     strokeWidth={2}
                     dot={false}
