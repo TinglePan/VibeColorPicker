@@ -2,6 +2,60 @@ import { useState, useCallback, useEffect } from 'react'
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, LineChart, ComposedChart, Legend } from 'recharts'
 import './Step1.css'
 
+// Format number to have at least 3 significant digits and at least 3 decimal places
+const formatWithSigFigsAndDecimals = (num) => {
+  if (num === 0) return '0.000'
+  if (!isFinite(num)) return String(num)
+  
+  const absNum = Math.abs(num)
+  const sign = num < 0 ? '-' : ''
+  
+  // Format to 3 significant digits
+  const precisionStr = absNum.toPrecision(3)
+  
+  // Handle scientific notation (for very small or very large numbers)
+  if (precisionStr.includes('e')) {
+    // Parse scientific notation: e.g., "1.23e-4" -> mantissa is "1.23", exponent is -4
+    const match = precisionStr.match(/^([\d.]+)e([+-]?\d+)$/)
+    if (match) {
+      const mantissa = match[1]
+      const exponent = parseInt(match[2], 10)
+      
+      // Calculate decimal places needed to show 3 sig figs
+      // For negative exponent, need more decimal places: -exponent + (digits after decimal in mantissa)
+      const mantissaParts = mantissa.split('.')
+      const digitsAfterDecimal = mantissaParts.length > 1 ? mantissaParts[1].length : 0
+      const decimalPlaces = Math.max(3, -exponent + digitsAfterDecimal)
+      
+      // Convert to regular number and format
+      const precisionNum = parseFloat(precisionStr)
+      return sign + precisionNum.toFixed(decimalPlaces)
+    }
+  }
+  
+  // For non-scientific notation, count decimal places in the precision string
+  const parts = precisionStr.split('.')
+  let decimalPlaces = 0
+  
+  if (parts.length > 1) {
+    // Has decimal point, count digits after it
+    decimalPlaces = parts[1].length
+  } else {
+    // No decimal point, check if we need decimals for 3 sig figs
+    const intPart = parts[0]
+    if (intPart.length < 3) {
+      // Need some decimal places to show 3 sig figs
+      decimalPlaces = 3 - intPart.length
+    }
+  }
+  
+  // Ensure at least 3 decimal places
+  decimalPlaces = Math.max(decimalPlaces, 3)
+  
+  const precisionNum = parseFloat(precisionStr)
+  return sign + precisionNum.toFixed(decimalPlaces)
+}
+
 // Custom Tooltip Content for accurate regression line values
 const CustomTooltip = ({ active, payload, label, m, n, xLabel, yLabel }) => {
   if (!active) return null
@@ -272,14 +326,14 @@ function Step1({
               </label>
             </div>
             <div className="function-display">
-              <strong>y = {m.toFixed(4)}x + {n.toFixed(4)}</strong>
+              <strong>y = {formatWithSigFigsAndDecimals(m)}x + {formatWithSigFigsAndDecimals(n)}</strong>
             </div>
           </div>
 
           <div className="step1-section">
             <h3>Plot</h3>
             <div className="plot-title">
-              <strong>y = {m.toFixed(4)}x + {n.toFixed(4)}</strong>
+              <strong>y = {formatWithSigFigsAndDecimals(m)}x + {formatWithSigFigsAndDecimals(n)}</strong>
             </div>
             <div className="label-inputs">
               <label>
