@@ -185,19 +185,24 @@ function Step1({
     const maxBrRatio = Math.max(...data.map(d => d.brRatio))
     const padding = (maxBrRatio - minBrRatio) * 0.1 || 0.1
     
-    const xStart = Math.max(0, minBrRatio - padding)
+    // Start from 0 to show the full line from origin
+    const xStart = 0
     const xEnd = maxBrRatio + padding
     
     // Generate multiple points along the regression line for accurate tooltips
     // Using 100 points for smooth interpolation
     // Since concentration = m * brRatio + n
+    // Filter out points where either x or y is negative
     const numPoints = 100
     const points = []
     
     for (let i = 0; i <= numPoints; i++) {
       const brRatio = xStart + (xEnd - xStart) * (i / numPoints)
       const concentration = m * brRatio + n
-      points.push({ concentration, brRatio })
+      // Only include points where both x and y are >= 0
+      if (brRatio >= 0 && concentration >= 0) {
+        points.push({ concentration, brRatio })
+      }
     }
     
     return points
@@ -307,14 +312,14 @@ function Step1({
                     type="number"
                     dataKey="brRatio"
                     name="B/R ratio"
-                    domain={['auto', 'auto']}
+                    domain={[0, 'auto']}
                     label={{ value: xLabel, position: 'insideBottom', offset: -5 }}
                   />
                   <YAxis
                     type="number"
                     dataKey="concentration"
                     name="Concentration"
-                    domain={['auto', 'auto']}
+                    domain={[0, 'auto']}
                     label={{ value: yLabel, angle: -90, position: 'insideLeft' }}
                   />
                   <Tooltip
