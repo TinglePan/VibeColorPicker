@@ -17,6 +17,7 @@ function Step2({
   const [concentration, setConcentration] = useState(null)
   const [cursorPos, setCursorPos] = useState(null)
   const canvasRef = useRef(null)
+  const canvasCtxRef = useRef(null)
   const imageRef = useRef(null)
   const containerRef = useRef(null)
   const canvasWrapperRef = useRef(null)
@@ -56,10 +57,17 @@ function Step2({
       img.crossOrigin = 'anonymous'
       img.onload = () => {
         const canvas = canvasRef.current
-        const ctx = canvas.getContext('2d')
+        const ctx = canvas.getContext('2d', {
+          colorSpace: 'srgb',
+          willReadFrequently: true
+        })
+        // Disable image smoothing to get accurate pixel data
+        ctx.imageSmoothingEnabled = false
         canvas.width = img.width
         canvas.height = img.height
         ctx.drawImage(img, 0, 0)
+        // Store the context for reuse
+        canvasCtxRef.current = ctx
         imageRef.current = img
         // Reset zoom and pan when new image loads
         setZoom(1)
@@ -110,11 +118,19 @@ function Step2({
   }
 
   const getAverageColor = (ctx, x, y, radius) => {
+    // Ensure we're using integer coordinates for accurate pixel reading
+    const intX = Math.floor(x)
+    const intY = Math.floor(y)
+    
     if (radius === 0) {
-      // Point picker
-      const imageData = ctx.getImageData(x, y, 1, 1)
-      const [r, g, b] = imageData.data
-      return { r, g, b, a: imageData.data[3] }
+      // Point picker - read exact pixel
+      const imageData = ctx.getImageData(intX, intY, 1, 1)
+      // ImageData.data is [R, G, B, A] for the pixel
+      const r = imageData.data[0]
+      const g = imageData.data[1]
+      const b = imageData.data[2]
+      const a = imageData.data[3]
+      return { r, g, b, a }
     }
 
     // Circular region picker
@@ -125,8 +141,8 @@ function Step2({
       for (let dx = -radius; dx <= radius; dx++) {
         const distanceSquared = dx * dx + dy * dy
         if (distanceSquared <= radiusSquared) {
-          const px = Math.round(x + dx)
-          const py = Math.round(y + dy)
+          const px = intX + dx
+          const py = intY + dy
           
           if (px >= 0 && px < ctx.canvas.width && py >= 0 && py < ctx.canvas.height) {
             const imageData = ctx.getImageData(px, py, 1, 1)
@@ -186,16 +202,17 @@ function Step2({
   }
 
   const handleCanvasClick = (e) => {
-    if (!canvasRef.current || !imageRef.current || !regressionData) return
+    if (!canvasRef.current || !imageRef.current || !regressionData || !canvasCtxRef.current) return
 
     const canvas = canvasRef.current
     const { x, y } = screenToCanvas(e.clientX, e.clientY)
 
-    // Clamp coordinates to canvas bounds
-    const clampedX = Math.max(0, Math.min(canvas.width - 1, Math.round(x)))
-    const clampedY = Math.max(0, Math.min(canvas.height - 1, Math.round(y)))
+    // Clamp coordinates to canvas bounds and use floor for exact pixel reading
+    const clampedX = Math.max(0, Math.min(canvas.width - 1, Math.floor(x)))
+    const clampedY = Math.max(0, Math.min(canvas.height - 1, Math.floor(y)))
 
-    const ctx = canvas.getContext('2d')
+    // Use the stored context instead of creating a new one
+    const ctx = canvasCtxRef.current
     const color = getAverageColor(ctx, clampedX, clampedY, radius)
     
     setPickedColor(color)
