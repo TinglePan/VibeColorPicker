@@ -151,23 +151,24 @@ function Step2({
 
   // Convert screen coordinates to canvas coordinates accounting for zoom and pan
   const screenToCanvas = (clientX, clientY) => {
-    if (!canvasRef.current || !containerRef.current) return { x: 0, y: 0 }
+    if (!canvasRef.current) return { x: 0, y: 0 }
     const canvas = canvasRef.current
-    const container = containerRef.current
-    const containerRect = container.getBoundingClientRect()
+    const canvasRect = canvas.getBoundingClientRect()
     
-    // Get position relative to container
-    const relativeX = clientX - containerRect.left
-    const relativeY = clientY - containerRect.top
+    // Get position relative to the canvas element (which already accounts for CSS transform)
+    const relativeX = clientX - canvasRect.left
+    const relativeY = clientY - canvasRect.top
     
-    // Account for pan offset (pan moves the image within container)
-    const imageX = relativeX - panOffset.x
-    const imageY = relativeY - panOffset.y
+    // Calculate the scale factor between displayed size and natural canvas size
+    // The canvas might be scaled down to fit the container (maxWidth: 100%)
+    const scaleX = canvas.width / canvasRect.width
+    const scaleY = canvas.height / canvasRect.height
     
-    // Convert to canvas coordinates accounting for zoom
-    // The canvas is scaled by zoom, so we divide by zoom to get original canvas coordinates
-    const canvasX = imageX / zoom
-    const canvasY = imageY / zoom
+    // Convert to natural canvas coordinates
+    // Since the CSS transform (scale and translate) is already applied to the bounding rect,
+    // we just need to account for the size difference
+    const canvasX = relativeX * scaleX
+    const canvasY = relativeY * scaleY
     
     return { x: canvasX, y: canvasY }
   }
