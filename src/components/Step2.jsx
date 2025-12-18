@@ -220,9 +220,10 @@ function Step2({
     // Calculate B/R ratio
     const brRatio = color.r > 0 ? color.b / color.r : 0
 
-    // Apply linear function: y = mx + n
+    // Apply linear function: brRatio = m * concentration + n
+    // Solve for concentration: concentration = (brRatio - n) / m
     const { m, n } = regressionData
-    const calculatedConcentration = m * brRatio + n
+    const calculatedConcentration = m !== 0 ? (brRatio - n) / m : 0
 
     setConcentration(calculatedConcentration)
     
@@ -659,7 +660,7 @@ function Step2({
             <div className="step2-section info-box">
               <h3>Calibration Function</h3>
               <p>y = {regressionData.m.toFixed(4)}x + {regressionData.n.toFixed(4)}</p>
-              <p>where x = B/R ratio, y = Concentration</p>
+              <p>where x = Concentration, y = B/R ratio</p>
             </div>
           )}
         </>

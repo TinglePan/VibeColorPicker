@@ -13,8 +13,8 @@ const CustomTooltip = ({ active, payload, label, m, n, xLabel, yLabel }) => {
   const scatterPayload = payload?.find(p => p.name === 'Data Points')
   
   // Always calculate regression line value if we have x coordinate
-  // Since concentration = m * brRatio + n, we have brRatio = (concentration - n) / m
-  const regressionValue = concentration !== null && m !== 0 ? (concentration - n) / m : null
+  // Since brRatio = m * concentration + n (x = concentration, y = brRatio)
+  const regressionValue = concentration !== null ? m * concentration + n : null
   
   return (
     <div style={{
@@ -139,7 +139,7 @@ function Step1({
 
   const performRegression = (tuples) => {
     // Linear regression: y = mx + n
-    // x = B/R ratio, y = Concentration
+    // x = Concentration, y = B/R ratio
     const n = tuples.length
     let sumX = 0
     let sumY = 0
@@ -147,10 +147,10 @@ function Step1({
     let sumXX = 0
 
     tuples.forEach(({ brRatio, concentration }) => {
-      sumX += brRatio
-      sumY += concentration
-      sumXY += brRatio * concentration
-      sumXX += brRatio * brRatio
+      sumX += concentration
+      sumY += brRatio
+      sumXY += concentration * brRatio
+      sumXX += concentration * concentration
     })
 
     const meanX = sumX / n
@@ -191,14 +191,14 @@ function Step1({
     
     // Generate multiple points along the regression line for accurate tooltips
     // Using 100 points for smooth interpolation
-    // Since concentration = m * brRatio + n, we have brRatio = (concentration - n) / m
+    // Since brRatio = m * concentration + n (x = concentration, y = brRatio)
     // Filter out points where either x or y is negative
     const numPoints = 100
     const points = []
     
     for (let i = 0; i <= numPoints; i++) {
       const concentration = xStart + (xEnd - xStart) * (i / numPoints)
-      const brRatio = m !== 0 ? (concentration - n) / m : 0
+      const brRatio = m * concentration + n
       // Only include points where both x and y are >= 0
       if (concentration >= 0 && brRatio >= 0) {
         points.push({ concentration, brRatio })
