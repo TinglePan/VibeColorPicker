@@ -91,6 +91,9 @@ function Step2({
   // Touch gesture state
   const [touchStart, setTouchStart] = useState(null)
   const [pinchStart, setPinchStart] = useState(null)
+  
+  // Save state
+  const [saveMessage, setSaveMessage] = useState(null)
 
   // Sync local state with props when they change from parent
   useEffect(() => {
@@ -427,6 +430,48 @@ function Step2({
     setPinchStart(null)
   }
 
+  // Save picked color and concentration to localStorage
+  const handleSaveData = () => {
+    if (!pickedColor || concentration === null) {
+      setSaveMessage('No data to save. Please pick a color first.')
+      setTimeout(() => setSaveMessage(null), 3000)
+      return
+    }
+
+    // Format: [[R, G, B], Concentration]
+    const newEntry = [[pickedColor.r, pickedColor.g, pickedColor.b], concentration]
+    
+    // Get existing data from localStorage
+    const existingDataJson = localStorage.getItem('vibeColorPickerData')
+    let existingData = []
+    
+    if (existingDataJson) {
+      try {
+        existingData = JSON.parse(existingDataJson)
+        if (!Array.isArray(existingData)) {
+          existingData = []
+        }
+      } catch (e) {
+        console.error('Error parsing existing data:', e)
+        existingData = []
+      }
+    }
+    
+    // Add new entry
+    existingData.push(newEntry)
+    
+    // Save back to localStorage
+    try {
+      localStorage.setItem('vibeColorPickerData', JSON.stringify(existingData))
+      setSaveMessage(`Saved! Total entries: ${existingData.length}`)
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch (e) {
+      console.error('Error saving data:', e)
+      setSaveMessage('Error saving data. Please try again.')
+      setTimeout(() => setSaveMessage(null), 3000)
+    }
+  }
+
   // Touch handlers that differentiate tap, drag, and pinch
   const handleCanvasTouchStart = (e) => {
     if (!canvasRef.current || !imageRef.current) return
@@ -706,6 +751,12 @@ function Step2({
                     {concentration !== null ? concentration.toFixed(2) : 'N/A'}
                   </div>
                 </div>
+              </div>
+              <div className="save-section">
+                <button onClick={handleSaveData} className="save-btn">
+                  Save Data Point
+                </button>
+                {saveMessage && <div className="save-message">{saveMessage}</div>}
               </div>
             </div>
           )}

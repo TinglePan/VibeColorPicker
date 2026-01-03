@@ -133,6 +133,54 @@
   font-size: 1.5rem;
 }
 
+.save-section {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.save-btn {
+  padding: 0.75rem 1.5rem;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background 0.3s;
+}
+
+.save-btn:hover {
+  background: #1976D2;
+}
+
+.save-btn:active {
+  transform: scale(0.98);
+}
+
+.save-message {
+  padding: 0.5rem 1rem;
+  background: #4CAF50;
+  color: white;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .info-box {
   background: #e8f5e9;
   border-left: 4px solid #4CAF50;

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Step1 from './components/Step1'
 import Step2 from './components/Step2'
+import Step3 from './components/Step3'
 import './App.css'
 
 function App() {
@@ -44,6 +45,12 @@ function App() {
           >
             Step 2: Color Picker
           </button>
+          <button
+            className={`step-btn ${step === 3 ? 'active' : ''}`}
+            onClick={() => setStep(3)}
+          >
+            Step 3: Export Data
+          </button>
         </div>
       </header>
       
@@ -61,7 +68,7 @@ function App() {
             onXLabelChange={setStep1XLabel}
             onYLabelChange={setStep1YLabel}
           />
-        ) : (
+        ) : step === 2 ? (
           <Step2
             regressionData={regressionData}
             imageUrl={step2ImageUrl}
@@ -71,6 +78,8 @@ function App() {
             onImageChange={setStep2Image}
             onRadiusChange={setStep2Radius}
           />
+        ) : (
+          <Step3 />
         )}
       </main>
     </div>
