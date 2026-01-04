@@ -23,6 +23,24 @@
   font-size: 1.1rem;
 }
 
+.cached-data-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #e3f2fd;
+  border-left: 4px solid #2196F3;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  color: #1565c0;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.cache-icon {
+  font-size: 1.2rem;
+}
+
 .file-upload-area {
   display: flex;
   flex-direction: column;

@@ -278,6 +278,12 @@ function Step1({
     <div className="step1-container">
       <div className="step1-section">
         <h2>Step 1: Upload Calibration Data</h2>
+        {data && data.length > 0 && (
+          <div className="cached-data-indicator">
+            <span className="cache-icon">💾</span>
+            <span>Calibration data loaded ({data.length} data points)</span>
+          </div>
+        )}
         <div className="file-upload-area">
           <input
             type="file"
@@ -287,7 +293,7 @@ function Step1({
             className="file-input"
           />
           <label htmlFor="json-upload" className="file-label">
-            Choose JSON File
+            {data && data.length > 0 ? 'Load New Calibration' : 'Choose JSON File'}
           </label>
         </div>
         {fileError && <div className="error-message">{fileError}</div>}

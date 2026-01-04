@@ -5,11 +5,13 @@ function Step3() {
   const [savedData, setSavedData] = useState([])
   const [message, setMessage] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [calibrationInfo, setCalibrationInfo] = useState(null)
   const entriesPerPage = 10
 
   // Load data from localStorage on mount
   useEffect(() => {
     loadData()
+    loadCalibrationInfo()
   }, [])
 
   const loadData = () => {
@@ -29,6 +31,18 @@ function Step3() {
       }
     } else {
       setSavedData([])
+    }
+  }
+
+  const loadCalibrationInfo = () => {
+    const calibrationJson = localStorage.getItem('vibeColorPickerCalibration')
+    if (calibrationJson) {
+      try {
+        const calibration = JSON.parse(calibrationJson)
+        setCalibrationInfo(calibration)
+      } catch (e) {
+        console.error('Error loading calibration info:', e)
+      }
     }
   }
 
@@ -84,6 +98,7 @@ function Step3() {
 
   const handleRefresh = () => {
     loadData()
+    loadCalibrationInfo()
     setMessage('Data refreshed!')
     setTimeout(() => setMessage(null), 2000)
   }
@@ -128,6 +143,16 @@ function Step3() {
         <p className="description">
           Export your saved color measurements to a JSON file. The exported data will be in the same format as the calibration input in Step 1.
         </p>
+        {calibrationInfo && (
+          <div className="calibration-info">
+            <span className="info-icon">ℹ️</span>
+            <div>
+              <strong>Current Calibration:</strong> {calibrationInfo.data?.length || 0} calibration points
+              <br />
+              <small>Last updated: {new Date(calibrationInfo.timestamp).toLocaleString()}</small>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="step3-section">

@@ -32,7 +32,29 @@
 .description {
   color: #666;
   line-height: 1.6;
-  margin: 0;
+  margin: 0 0 1rem 0;
+}
+
+.calibration-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 4px;
+  margin-top: 1rem;
+  color: #856404;
+  font-size: 0.9rem;
+}
+
+.info-icon {
+  font-size: 1.2rem;
+}
+
+.calibration-info small {
+  color: #856404;
+  opacity: 0.8;
 }
 
 .data-summary {
