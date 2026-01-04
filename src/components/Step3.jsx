@@ -4,6 +4,8 @@ import './Step3.css'
 function Step3() {
   const [savedData, setSavedData] = useState([])
   const [message, setMessage] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const entriesPerPage = 10
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -17,6 +19,7 @@ function Step3() {
         const data = JSON.parse(dataJson)
         if (Array.isArray(data)) {
           setSavedData(data)
+          setCurrentPage(1) // Reset to first page when data loads
         } else {
           setSavedData([])
         }
@@ -85,6 +88,39 @@ function Step3() {
     setTimeout(() => setMessage(null), 2000)
   }
 
+  const handleDeleteEntry = (index) => {
+    if (window.confirm(`Are you sure you want to delete entry #${index + 1}?`)) {
+      try {
+        const newData = savedData.filter((_, i) => i !== index)
+        localStorage.setItem('vibeColorPickerData', JSON.stringify(newData))
+        setSavedData(newData)
+        
+        // Adjust current page if needed
+        const totalPages = Math.ceil(newData.length / entriesPerPage)
+        if (currentPage > totalPages && totalPages > 0) {
+          setCurrentPage(totalPages)
+        }
+        
+        setMessage('Entry deleted successfully.')
+        setTimeout(() => setMessage(null), 3000)
+      } catch (e) {
+        console.error('Error deleting entry:', e)
+        setMessage('Error deleting entry. Please try again.')
+        setTimeout(() => setMessage(null), 3000)
+      }
+    }
+  }
+
+  // Calculate pagination
+  const totalPages = Math.ceil(savedData.length / entriesPerPage)
+  const startIndex = (currentPage - 1) * entriesPerPage
+  const endIndex = startIndex + entriesPerPage
+  const currentEntries = savedData.slice(startIndex, endIndex)
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
+
   return (
     <div className="step3-container">
       <div className="step3-section">
@@ -100,14 +136,91 @@ function Step3() {
           <>
             <div className="data-summary">
               <p><strong>Total entries:</strong> {savedData.length}</p>
+              {totalPages > 1 && (
+                <p><strong>Page:</strong> {currentPage} of {totalPages}</p>
+              )}
             </div>
-            <div className="data-preview">
-              <h4>Preview (first 5 entries):</h4>
-              <pre className="json-preview">
-                {JSON.stringify(savedData.slice(0, 5), null, 2)}
-                {savedData.length > 5 && '\n... and ' + (savedData.length - 5) + ' more entries'}
-              </pre>
+            
+            <div className="data-entries">
+              {currentEntries.map((entry, index) => {
+                const actualIndex = startIndex + index
+                const [color, concentration] = entry
+                const [r, g, b] = color
+                const brRatio = r > 0 ? (b / r).toFixed(4) : '0.0000'
+                
+                return (
+                  <div key={actualIndex} className="data-entry-card">
+                    <div className="entry-header">
+                      <span className="entry-number">Entry #{actualIndex + 1}</span>
+                      <button 
+                        onClick={() => handleDeleteEntry(actualIndex)}
+                        className="delete-entry-btn"
+                        title="Delete this entry"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="entry-content">
+                      <div className="entry-item">
+                        <label>Color:</label>
+                        <div className="color-info">
+                          <div 
+                            className="color-swatch-small"
+                            style={{ backgroundColor: `rgb(${r}, ${g}, ${b})` }}
+                          />
+                          <span className="rgb-values">RGB({r}, {g}, {b})</span>
+                        </div>
+                      </div>
+                      <div className="entry-item">
+                        <label>B/R Ratio:</label>
+                        <span className="entry-value">{brRatio}</span>
+                      </div>
+                      <div className="entry-item">
+                        <label>Concentration:</label>
+                        <span className="entry-value highlight">{concentration.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  onClick={() => goToPage(1)}
+                  disabled={currentPage === 1}
+                  className="page-btn"
+                >
+                  « First
+                </button>
+                <button 
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="page-btn"
+                >
+                  ‹ Prev
+                </button>
+                <span className="page-info">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button 
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="page-btn"
+                >
+                  Next ›
+                </button>
+                <button 
+                  onClick={() => goToPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="page-btn"
+                >
+                  Last »
+                </button>
+              </div>
+            )}
+
             <div className="button-group">
               <button onClick={handleExport} className="export-btn">
                 Export to JSON File
